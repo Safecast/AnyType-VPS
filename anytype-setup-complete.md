@@ -2,7 +2,7 @@
 
 **Server:** simplemap.safecast.org (65.108.24.131)  
 **Date:** February 19, 2026  
-**Status:** ✅ Complete - Awaiting firewall configuration
+**Status:** ✅ **COMPLETE AND WORKING**
 
 ---
 
@@ -188,20 +188,24 @@ cat ~/anytype-client-config.yml
 **Location:** `~/anytype-client-config.yml`
 
 ```yaml
-id: 6996edc574db9dd37420fdf2
-networkId: N4fmB1wEwuUffXQSihAxcEhCbQw4H3mwdwU97EctS6yH3doK
+id: 6996fb7874db9ded5e9daba0
+networkId: N5Xkmn5vF7cwthDjh6avXem2q1Q56P5xkji19SDU8PQ9m6uD
 nodes:
-    - peerId: 12D3KooWR4wYLUNahA4ifVxFi8Z1e2qMLYzSXmQVzefc763iaiZp
+    - peerId: 12D3KooWCDxPTGbLoaBJewKcMRpppKzwG36Zp57evuUBGkcVURhQ
       addresses:
         - quic://simplemap.safecast.org:33020
         - simplemap.safecast.org:33010
+        - quic://65.108.24.131:33020
+        - 65.108.24.131:33010
       types:
         - coordinator
         - consensus
         - tree
         - file
-creationTime: 2026-02-19T11:04:03.643442801Z
+creationTime: 2026-02-19T12:01:37.702749073Z
 ```
+
+> **Note:** The config includes both domain and IP addresses for maximum compatibility.
 
 ---
 
@@ -211,11 +215,10 @@ creationTime: 2026-02-19T11:04:03.643442801Z
 
 | Port | Protocol | Component | Status |
 |------|----------|-----------|--------|
-| 33010 | TCP | any-sync-node | ⚠️ Requires firewall config |
-| 33020 | UDP | any-sync-node (QUIC) | ⚠️ Requires firewall config |
-| 33030 | TCP | any-sync-filenode | ⚠️ Requires firewall config |
-| 33060 | TCP | any-sync-coordinator | ⚠️ Requires firewall config |
-| 33080 | TCP | any-sync-consensusnode | ⚠️ Requires firewall config |
+| 33010 | TCP | any-sync-node | ✅ Open |
+| 33020 | UDP | any-sync-node (QUIC) | ✅ Open |
+
+> **Note:** Only ports 33010 (TCP) and 33020 (UDP) are required for the any-sync-bundle to function. The bundle consolidates all services into a single process.
 
 ### Hetzner Firewall Rules (Incoming)
 
@@ -225,22 +228,56 @@ Add these rules in the Hetzner Cloud Console → Security → Firewalls:
 |------|----------|-----------|------------------|--------|
 | anytype-sync | TCP | 0.0.0.0/0 | 33010 | Accept |
 | anytype-quic | UDP | 0.0.0.0/0 | 33020 | Accept |
-| anytype-filenode | TCP | 0.0.0.0/0 | 33030 | Accept |
-| anytype-coordinator | TCP | 0.0.0.0/0 | 33060 | Accept |
-| anytype-consensus | TCP | 0.0.0.0/0 | 33080 | Accept |
 
 ---
 
 ## Connecting the Anytype Client
 
-1. Open Anytype app
-2. Log out if already logged in (go to onboarding screen)
-3. Click the **gear icon** in the top right corner
+1. Open Anytype app on your Linux/macOS/Windows computer
+
+2. **Log out** if already logged in (you need to be on the onboarding screen)
+
+3. Click the **gear icon** ⚙️ in the top right corner
+
 4. Go to **Networks → Self-hosted**
+
 5. Click **"Tap to provide your network configuration"**
-6. Upload `~/anytype-client-config.yml`
+
+6. **Upload** the config file: `~/anytype-client-config.yml`
+
 7. Click **Save**
-8. Log in with your Anytype account
+
+8. **Log in** with your Anytype account credentials
+
+### ✅ Success Indicators
+
+- You should see "Connected to self-hosted network" message
+- Your sync status should show as active
+- You can now create/edit objects and they will sync to your server
+
+### Troubleshooting Connection Issues
+
+**Error: "HTTP response at 400 or 500 level, http status code: 0"**
+
+This usually means:
+1. **Firewall blocking ports** - Ensure ports 33010/tcp and 33020/udp are open in your VPS provider's firewall
+2. **Config not loaded** - Remove old network config and re-import the client-config.yml file
+3. **Version mismatch** - Ensure your Anytype client version is compatible with the bundle version
+
+**Test connectivity:**
+```bash
+# From your local machine
+nc -zv 65.108.24.131 33010  # Should succeed
+nc -zuv 65.108.24.131 33020 # Should succeed
+```
+
+**Regenerate config if needed:**
+```bash
+ssh root@simplemap.safecast.org "sudo systemctl stop anytype && sudo rm -f /var/lib/anytype/bundle-config.yml /var/lib/anytype/data/client-config.yml && sudo -u anytype any-sync-bundle start-bundle --bundle-config /var/lib/anytype/bundle-config.yml --client-config /var/lib/anytype/data/client-config.yml --initial-storage /var/lib/anytype/data/storage --initial-external-addrs \"simplemap.safecast.org,65.108.24.131\" --initial-mongo-uri \"mongodb://127.0.0.1:27017/?replicaSet=rs0\" --initial-redis-uri \"redis://127.0.0.1:6379/\" && sudo systemctl start anytype"
+
+# Copy new config
+scp root@simplemap.safecast.org:/var/lib/anytype/data/client-config.yml ~/anytype-client-config.yml
+```
 
 ---
 
@@ -361,3 +398,81 @@ ssh root@simplemap.safecast.org "redis-cli MODULE LIST"
 - RedisStack includes the Bloom filter module required by any-sync-bundle
 - All services are set to auto-start on boot
 - Configuration files are stored in `/var/lib/anytype/`
+
+---
+
+## Final Summary
+
+### ✅ Setup Complete!
+
+Your Anytype self-hosted sync server is now fully operational on **simplemap.safecast.org**.
+
+### What Was Installed
+
+| Component | Version | Status |
+|-----------|---------|--------|
+| any-sync-bundle | v1.3.1-2026-02-16 | ✅ Running |
+| MongoDB | 7.0.30 | ✅ Running (replica set) |
+| RedisStack | 7.4.0-v8 | ✅ Running (with Bloom filter) |
+
+### Server Details
+
+| Item | Value |
+|------|-------|
+| **Domain** | simplemap.safecast.org |
+| **IP Address** | 65.108.24.131 |
+| **Network ID** | N5Xkmn5vF7cwthDjh6avXem2q1Q56P5xkji19SDU8PQ9m6uD |
+| **Peer ID** | 12D3KooWCDxPTGbLoaBJewKcMRpppKzwG36Zp57evuUBGkcVURhQ |
+| **Config File** | ~/anytype-client-config.yml |
+
+### Open Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 33010 | TCP | DRPC sync protocol |
+| 33020 | UDP | QUIC protocol |
+
+### Resource Usage
+
+- **Total RAM:** ~250-300MB at idle
+- **CPU:** Minimal (< 5% at idle)
+- **Disk:** Varies based on stored data
+
+### Important Files to Backup
+
+```bash
+# Critical - contains private keys!
+/var/lib/anytype/bundle-config.yml
+
+# Your sync data
+/var/lib/anytype/data/storage/
+
+# MongoDB data (use mongodump)
+/var/lib/mongodb/
+```
+
+### Quick Start Commands
+
+```bash
+# Check all services status
+ssh root@simplemap.safecast.org "sudo systemctl status anytype mongod redis-stack-server"
+
+# View live logs
+ssh root@simplemap.safecast.org "sudo journalctl -u anytype -f"
+
+# Restart anytype service
+ssh root@simplemap.safecast.org "sudo systemctl restart anytype"
+
+# Test port connectivity from local machine
+nc -zv 65.108.24.131 33010
+nc -zuv 65.108.24.131 33020
+```
+
+---
+
+## References
+
+- [Anytype Documentation](https://doc.anytype.io)
+- [any-sync-bundle GitHub](https://github.com/grishy/any-sync-bundle)
+- [RedisStack Documentation](https://redis.io/docs/stack/)
+- [MongoDB Documentation](https://docs.mongodb.org/manual)
