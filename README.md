@@ -240,3 +240,4 @@ If your setup is working, you should see:
 - ✅ Sync status showing as active
 
 Enjoy your self-hosted Anytype server! 🚀
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Safecast/AnyType-VPS)
