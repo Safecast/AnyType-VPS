@@ -1,0 +1,3 @@
+[submodule "vendor/anytype-ts"]
+	path = vendor/anytype-ts
+	url = https://codeberg.org/Safecast/anytype-ts.git
