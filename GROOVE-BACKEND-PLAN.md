@@ -72,6 +72,20 @@ This is the one sentence the whole kernel is designed around. It forces:
 
 Every PR against the kernel is checked against this invariant. A failing replay test is a blocker.
 
+### 2.0.6 — CRDT engine split
+**Hand-rolled signed op-based CRDT for the membership log; Automerge for object content.**
+- Membership log is small, security-critical, audit-heavy, and has explicit authority rules ("admin at causal frontier"). Off-the-shelf CRDTs are permissionless-merge by design — the validity check would have to wrap the CRDT, which fights the abstraction. Hand-rolled = the merge function *is* the rule set.
+- Object content (text, block trees, lists) is large, free-form, high-conflict, and benefits from a mature CRDT. `automerge-go` carries that load.
+- Cost of hand-rolling membership: ~1–2 weeks of code + tests. Mitigated by the small surface (≈500 LOC), exhaustive testability, and the fact that signed-op-on-causal-DAG is well-trodden territory (Matrix room state, Keybase sigchains, Scuttlebutt feeds).
+- We are **not** writing an "ad-hoc" CRDT. The pattern is: signed ops, vector-clock causal order, deterministic tie-breaks by content hash, validity as a pure function of `(log_prefix, op)`.
+
+### 2.0.7 — Wire format
+**Canonical JSON (RFC 8785 / JCS) for all kernel ops; protobuf is rejected.**
+- Choice favors transparency, debugging, and no codegen step over compactness.
+- **Implementation requirement:** Go's stdlib `encoding/json` is **not** byte-stable enough for hash-and-sign. Map keys are sorted, but number formatting, Unicode escapes, and trailing-zero handling diverge from RFC 8785. Use a JCS implementation (e.g. `github.com/gibson042/canonicaljson-go`) or implement RFC 8785 ourselves. Any code path that produces bytes-to-be-signed *must* go through the canonicalizer; bytes-to-be-displayed may use stdlib.
+- Determinism gate: `canonicalize(unmarshal(canonicalize(x))) == canonicalize(x)` — round-trip stable. The replay test suite (Phase 4) checks this for every op kind.
+- Files larger than ~64 KB do not go inline in JSON ops; they live as content-addressed blobs (`/groove/files/1.0.0`) and the op carries the hash only.
+
 ---
 
 ## 3. The four things the kernel must have
